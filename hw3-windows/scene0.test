@@ -1,0 +1,32 @@
+size 640 480
+
+output scene0.png 
+
+ambient 0 0 0
+specular 0 0 0
+shininess 1
+emission 0 0 0
+
+#camera -10 22 0 0 0 0 1 1 0 30
+#camera 100 100 0 0 0 0 0 1 0 30
+camera -60 50 50 -10 0 0 0 1 0 30
+
+
+vertex -30 0 -30
+vertex +30 0 -30 
+vertex +30 0 +30
+vertex -30 0 +30
+
+point 10 20 0  1 1 1
+
+#light
+sphere -10 20 0 1
+
+diffuse 0 1 1
+sphere 0 5 0 5
+
+diffuse 0 1 0.5
+tri 0 2 1
+tri 0 3 2
+
+
