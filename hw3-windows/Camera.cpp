@@ -10,6 +10,7 @@ Ray Camera::generateRay(float sx, float sy, float aspectRatio)
 	vec3 u = up * scale_u;
 	Ray ray(eye);
 	vec3 vec_un =  front + r + u;
-	ray.direction = glm::normalize(vec_un);
+	//ray.direction = glm::normalize(vec_un);
+	ray.direction = vec_un;
     return ray;
 }

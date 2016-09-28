@@ -186,6 +186,7 @@ void ReadFile::readfile(const char* filename, Film & film)
 						film.scene.height = h;
 						film.ratio = w * 1.0f / h;
 						film.samples = new Sample[w * h];
+						memset(film.samples, 0, sizeof(Sample) * w * h);
                     } 
                 } else if (cmd == "camera") {
                     validinput = readvals(s,10,values); // 10 values eye cen up fov
@@ -302,7 +303,7 @@ void ReadFile::readfile(const char* filename, Film & film)
 								obj.v2 = vertices[(int)(values[1])];
 								obj.v3 = vertices[(int)(values[2])];
 								obj.name = name;
-								//obj.transform();
+								obj.transform();
 							}
 							film.objects.push_back(obj);
                         }

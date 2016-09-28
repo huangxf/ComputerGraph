@@ -2,24 +2,45 @@
 #include "Sphere.h"
 #include <iostream>
 
+float clamp(float val)
+{
+	if(abs(val) <= 0.00000000000001) return 0.0f;
+	else return val;
+}
+
 IntersectResult Sphere::intersect(Ray ray)
 {
 	IntersectResult result;
 	if(this->type == 0) {
-		vec3 v = ray.origin - this->origin;
-		float a = glm::dot(v, v) - pow(this->radius, 2);
-		float DdotV = glm::dot(ray.direction, v);
-		float discr = DdotV * DdotV - a;
+		//vec3 v = ray.origin - this->origin;
+		//float a = glm::dot(v, v) - pow(this->radius, 2);
+		//float DdotV = glm::dot(ray.direction, v);
+		//float discr = DdotV * DdotV - a;
+		//if(discr >= 0)
+		//{
+		//	result.shape = this;
+		//	if(DdotV <= 0) {
+		//		result.distance = -DdotV - sqrt(discr);
+		//	} else {
+		//		result.distance = 0;
+		//	}
+		//	result.intersectionPoint = ray.origin + ray.direction * result.distance;
+		//	result.normal = glm::normalize(result.intersectionPoint - this->origin);
+
+		vec3 L = ray.origin - this->origin;
+		float A = glm::dot(ray.direction, ray.direction);
+		float B = 2 * glm::dot(ray.direction, L);
+		float C = glm::dot(L, L) - this->radius * this->radius;
+		float discr = clamp(B*B - 4 * A * C);
 		if(discr >= 0)
 		{
+			float dist = clamp((-B - sqrt(discr))/(2 * A));
+			if(dist < 0) {dist = clamp((-B + sqrt(discr))/(2 * A));}
 			result.shape = this;
-			if(DdotV <= 0) {
-				result.distance = -DdotV - sqrt(discr);
-			} else {
-				result.distance = 0;
-			}
+			result.distance = dist;
 			result.intersectionPoint = ray.origin + ray.direction * result.distance;
 			result.normal = glm::normalize(result.intersectionPoint - this->origin);
+
 			//vec3 temp = result.intersectionPoint - this->origin;
 			//float radius = sqrt(glm::dot(temp,temp));
 			//std::cout<<"radius:"<<radius<<std::endl;

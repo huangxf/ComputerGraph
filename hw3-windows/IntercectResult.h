@@ -12,7 +12,7 @@ class IntersectResult
 public:
 	IntersectResult()
 	{
-		distance = 0;
+		distance = -1;
 		shape = 0;
 	}
 	Sphere * shape;

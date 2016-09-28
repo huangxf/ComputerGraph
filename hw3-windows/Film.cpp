@@ -20,7 +20,7 @@ void Film::output(const char * path)
 		pixels[i*3 + 2] = (BYTE)samples[i].rgba.r;
 	}
 	FreeImage_Initialise();
-	FIBITMAP *img = FreeImage_ConvertFromRawBits(pixels, scene.width, scene.height, scene.width * 3, 24, 0xFF0000, 0x00FF00, 0x0000FF, false);
+	FIBITMAP *img = FreeImage_ConvertFromRawBits(pixels, scene.width, scene.height, scene.width * 3, 24, 0xFF0000, 0x00FF00, 0x0000FF, true);
 	FreeImage_Save(FIF_PNG, img, filename.c_str(), 0);
 	FreeImage_DeInitialise();
 	if(!pixels) delete[] pixels;
@@ -31,9 +31,11 @@ void Film::render()
 {
 	for(int j = 0; j < scene.height; j++)
 	{
-		float sy = 1 - (j + 0.5) * 1.0f / scene.height;
+		//j = 90;
+		float sy = (j + 0.5) * 1.0f / scene.height;
 		for(int i = 0; i < scene.width; i++)
 		{
+			//i = 162;
 			float sx = (i + 0.5) * 1.0f / scene.width;
 
 			Ray ray = camera.generateRay(sx, sy, this->ratio);
@@ -59,6 +61,12 @@ void Film::render()
 					//cout<<"["<<result.normal.x<<","<<result.normal.y<<","<<result.normal.z<<"]"<<endl;
 				//}
 				vec4 color = getColor(ray, result, 0); 
+				//163,326
+				//if(i == 162 && j == 90) 
+				//{
+				//	//cout<<"spot!"<<endl;
+				//	color = vec4(1.0f, 1.0f, 1.0f, 0.0f);
+				//}
 				Sample sample(
 					255 * color.x , 
 					255 * color.y, 
@@ -83,28 +91,36 @@ IntersectResult Film::trace(const Ray &ray)
 {
 		float min = 100000.00f;
 		IntersectResult result;
+		IntersectResult point;
 		for(vector<Sphere>::iterator it = objects.begin(); it != objects.end(); it++)
 		{
-			//物体保持不变，但是将光从World space转换到物体的local space, 然后作interstect测试。 考虑到在world space下，从局部变换过来的物体如果被ray击中
-			//那么这个过程等价于在local space下，原始物体被从world space转换到local space的ray击中。
-			Ray ray_inverse = ray;
-			mat4 trans_inverse = glm::inverse((*it).trans);
-			ray_inverse.direction = glm::normalize(vec3(trans_inverse * vec4(ray.direction, 0))); //注意扩展direction的时候必须用homogeneous coordinates，否则direction就不是方向向量了
-			ray_inverse.origin = vec3(trans_inverse * vec4(ray.origin, 1));
-			IntersectResult point = (*it).intersect(ray_inverse);
-			if(point.distance > 0)
+			if((*it).type == 0) {
+				//物体保持不变，但是将光从World space转换到物体的local space, 然后作interstect测试。 考虑到在world space下，从局部变换过来的物体如果被ray击中
+				//那么这个过程等价于在local space下，原始物体被从world space转换到local space的ray击中。
+				Ray ray_inverse = ray;
+				mat4 trans_inverse = glm::inverse((*it).trans);
+				ray_inverse.direction = vec3(trans_inverse * vec4(ray.direction, 0)); //注意扩展direction的时候必须用homogeneous coordinates，否则direction就不是方向向量了
+				ray_inverse.origin = vec3(trans_inverse * vec4(ray.origin, 1));
+				point = (*it).intersect(ray_inverse);
+			} else {
+				point = (*it).intersect(ray);
+			}
+			if(point.distance >= 0)
 			{
-				//由于ray在做intersection的时候变换到了局部坐标，因此判断之后还要再变回世界坐标
-				//相应的交点，法线，距离等都要重新计算
-				//注意三角形的法线在变换前后并不是不变的，所以也必须重新计算
-				point.intersectionPoint = vec3(point.shape->trans * vec4(point.intersectionPoint, 1));
-				vec3 origin_to_intersect =  point.intersectionPoint - ray.origin;
-				point.distance = sqrt(glm::dot(origin_to_intersect, origin_to_intersect));
+				if((*it).type == 0) {
+					//由于ray在做intersection的时候变换到了局部坐标，因此判断之后还要再变回世界坐标
+					//相应的交点，法线，距离等都要重新计算
+					//注意三角形的法线在变换前后并不是不变的，所以也必须重新计算
+					point.intersectionPoint = vec3((*it).trans * vec4(point.intersectionPoint, 1));
+					vec3 origin_to_intersect =  point.intersectionPoint - ray.origin;
+					//距离不用重新计算？？？
+					//point.distance = sqrt(glm::dot(origin_to_intersect, origin_to_intersect));
+					vec3 normal_transferd =  vec3(glm::transpose(glm::inverse((*it).trans)) * vec4(point.normal, 0));
+					point.normal = glm::normalize(normal_transferd);
+				}
 				if(point.distance < min)
 				{
 					min = point.distance;
-					vec3 normal_transferd =  vec3(glm::transpose(glm::inverse(point.shape->trans)) * vec4(point.normal, 0));
-					point.normal = glm::normalize(normal_transferd);
 					result = point;
 				}
 			}
@@ -119,7 +135,8 @@ vec4 Film::getColor(const Ray &ray, const IntersectResult &result, int depth)
 
 	vec3 point = result.intersectionPoint; //intersectionPoint
 
-	vec3 eyedirn = glm::normalize(camera.eye - point) ; 
+	//vec3 eyedirn = glm::normalize(camera.eye - point) ; 
+	vec3 eyedirn = glm::normalize(ray.origin - point);
 	vec3 _normal = glm::normalize(result.normal);
 
 	vec4 ambient(
@@ -153,33 +170,38 @@ vec4 Film::getColor(const Ray &ray, const IntersectResult &result, int depth)
 	finalColor = ambient + emission;
 
 
-	const static float EPSILON = 0.00001f;
+	const static float EPSILON = 0.0001f;
 
-	if(glm::dot(ray.direction,result.normal) < 0)
-			point = point + EPSILON * result.normal;
-	else
-			point = point - EPSILON * result.normal;
+	//if(glm::dot(ray.direction,result.normal) < 0)
+	//		point = point + EPSILON * result.normal;
+	//else
+	//		point = point - EPSILON * result.normal;
 	
 	for(vector<Light>::iterator it = lights.begin(); it !=  lights.end(); it++)
 	{
-		int vi = 0; //directional light是不会参加阴影计算的，所以这里必须是初始化为vi=0
+		int vi = 0; //directional light是不会参加阴影计算的，所以这里必须是初始化为vi=0(这个不对)
 		int type = (*it).type;
 
 		vec3 direction0;  
-		float light_dis_square = 0.0f;
-		if(type == 0)  direction0	= glm::normalize ((*it).light_v) ;
-		else {
+		float light_dis_square = 1000000.00f;
+		if(type == 0) {
+			direction0	= glm::normalize ((*it).light_v) ;
+			light_dis_square = 1000000.00f;
+		} else {
 			vec3 point_to_light = vec3((*it).light_v - point);
 			direction0 = glm::normalize(point_to_light);
+			light_dis_square = glm::dot(point_to_light, point_to_light);
+		}
+			point = result.intersectionPoint + EPSILON * direction0;
 			Ray shadow_ray(point);
 			shadow_ray.direction = glm::normalize(direction0);
-			light_dis_square = glm::dot(point_to_light, point_to_light);
 			IntersectResult shadow_result = trace(shadow_ray);
 			if(shadow_result.distance > 0 && (shadow_result.distance *  shadow_result.distance) < light_dis_square) vi = 0;
 			else vi = 1;
 			//vi = 1;
-		}
 
+
+		//vec3 intersect_eyedirn = (point - ray.origin);
 		vec3 half0 = glm::normalize (direction0 + eyedirn) ;
 		vec3 attenuation = (*it).attenuation;
 		vec4 col0 = computeLight(direction0, vec4((*it).rgb, 1), _normal, half0, diffuse, specular, shininess, vi, attenuation, light_dis_square) ;
@@ -189,10 +211,11 @@ vec4 Film::getColor(const Ray &ray, const IntersectResult &result, int depth)
 
 	
 	vec3 refDir = reflectDir(ray, result);
+	point = result.intersectionPoint + EPSILON * refDir;
 	Ray refRay(point);
 	refRay.direction = refDir;
 	IntersectResult ir = trace(refRay);
-	if(ir.distance > 0) {
+	if(ir.distance >= 0) {
 		//depth++;
 		vec4 nextLevelColor = (specular * getColor(refRay, ir, ++depth));
 		//if(depth == 1)  cout<<"["<<finalColor.x<<","<<finalColor.y<<","<<finalColor.z<<"]-->";
